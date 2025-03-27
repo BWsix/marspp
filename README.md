@@ -1,8 +1,9 @@
 ## What is MARS++?
 
-MARS++ adds C-like "function calls" to MIPS assembly language (targeting MARS system call). Currently, the following "function" are supported:
+MARS++ adds C-like "function calls" to MIPS assembly language (targeting MARS system call). Currently, the following "function"s are supported:
 
-- print_string(label | "string literal" [, label | "string literal"])
+- print_string(label)
+- print_string("string literal")
 - exit()
 
 ## Example
