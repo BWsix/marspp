@@ -328,8 +328,13 @@ int main(int argc, char **argv)
                 snprintf(buffer, (lexer.string_len + 1), "%s", lexer.string);
                 arrpush(output_asm, ((sv_t){ .string=buffer, .length=lexer.string_len }));
                 output_asm_first_data_label_idx = arrlen(output_asm) - 1;
-                output_asm_first_data_label_lpad.string = lexer.line_start;
-                output_asm_first_data_label_lpad.length = match_begin - lexer.line_start;
+
+                output_asm_first_data_label_lpad.length = match_end - match_begin;
+                output_asm_first_data_label_lpad.string = (char *)malloc(output_asm_first_data_label_lpad.length);
+                memcpy(output_asm_first_data_label_lpad.string, match_begin, output_asm_first_data_label_lpad.length);
+                for (int i = 0; i < output_asm_first_data_label_lpad.length; i++) {
+                    if (!_lexer_iswhite(output_asm_first_data_label_lpad.string[i])) output_asm_first_data_label_lpad.string[i] = ' ';
+                }
 
                 arrpush(output_asm, ((sv_t){ .string=match_end + 1, .length=last.length - (match_begin - last.string) - (match_end - match_begin) }));
             }
@@ -342,7 +347,11 @@ int main(int argc, char **argv)
 
                 bool parsing_second_arg = false;
             one_more_arg:
-                sv_t lpad = { .string=lexer.line_start, .length=match_begin - lexer.line_start };
+                sv_t lpad = { .string=(char *)malloc(match_begin - lexer.line_start), .length=(match_begin - lexer.line_start) };
+                memcpy(lpad.string, lexer.line_start, lpad.length);
+                for (int i = 0; i < lpad.length; i++) {
+                    if (!_lexer_iswhite(lpad.string[i])) lpad.string[i] = ' ';
+                }
 
                 sv_t last = arrpop(output_asm);
                 arrpush(output_asm, ((sv_t){ .string=last.string, .length=match_begin - last.string }));
