@@ -17,25 +17,25 @@ value:	.word	50	# integer of a preset value
 	bltz	$t2, LT				#jump to "LT" if input greater than the preset value
 
 EQ:
-	la $a0, label_marspp_0	# load Input is equal to the preset value
+	la $a0, label_marspp_0	# load "Input is equal to the preset value"
 	li $v0, 4	# specify print string service
-	syscall	# print Input is equal to the preset value
+	syscall	# print "Input is equal to the preset value"
 	li $v0, 10	# specify exit service
 	syscall	# exit
 	
 
 GT:
-	la $a0, label_marspp_1	# load Input is greater than the preset value
+	la $a0, label_marspp_1	# load "Input is greater than the preset value"
 	li $v0, 4	# specify print string service
-	syscall	# print Input is greater than the preset value
+	syscall	# print "Input is greater than the preset value"
 	li $v0, 10	# specify exit service
 	syscall	# exit
 	
 
 LT:
-	la $a0, label_marspp_2	# load Input is less than the preset value
+	la $a0, label_marspp_2	# load "Input is less than the preset value"
 	li $v0, 4	# specify print string service
-	syscall	# print Input is less than the preset value
+	syscall	# print "Input is less than the preset value"
 	li $v0, 10	# specify exit service
 	syscall	# exit
 	
