@@ -1,19 +1,18 @@
-# MARSPP - MIPS Assembly Preprocessor (Targeting MARS System Call)
+## What is MARS++?
 
-## What is MARSPP?
+MARS++ adds C-like "function calls" to MIPS assembly language (targeting MARS system call). Currently, the following "function" are supported:
 
-MARSPP is a preprocessor that adds C-like "function calls" to MIPS assembly language. Currently, MARSPP supports the `print_string(label)` function.
+- print_string(label | "string literal" [, label | "string literal"])
+- exit()
 
-For example, given an input file named `input.asm`:
+## Example
+
+Given an input file named `input.asm`:
 
 ```asm
-.data
-label:	.asciiz	"Hello world"
-
 .text
-	print_string(label)
-
-    # ...
+	print_string("Hello world!")
+	exit()
 ```
 
 After running the following command:
@@ -22,23 +21,22 @@ After running the following command:
 marspp input.asm output.asm
 ```
 
-MARSPP will generate an `output.asm` file where the `print_string(label)` directive gets expanded to:
+MARS++ will generate an `output.asm` with the corresponding assembly code:
 
 ```asm
-.data
-label:	.asciiz	"Hello world"
-
 .text
-	la $a0, label	# load label
+	la $a0, label_marspp_0	# load Hello world!
 	li $v0, 4	# specify print string service
-	syscall	# print label
+	syscall	# print Hello world!
+	li $v0, 10	# specify exit service
+	syscall	# exit
+	
+.data
 
-    # ...
+label_marspp_0:	.asciiz	"Hello world!"
 ```
 
 ## Getting Started
-
-You can build MARSPP using CMake.
 
 Usage:
 
