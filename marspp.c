@@ -329,9 +329,9 @@ int main(int argc, char **argv)
                 arrpush(output_asm, ((sv_t){ .string=buffer, .length=lexer.string_len }));
                 output_asm_first_data_label_idx = arrlen(output_asm) - 1;
 
-                output_asm_first_data_label_lpad.length = match_end - match_begin;
+                output_asm_first_data_label_lpad.length = match_begin - lexer.line_start;
                 output_asm_first_data_label_lpad.string = (char *)malloc(output_asm_first_data_label_lpad.length);
-                memcpy(output_asm_first_data_label_lpad.string, match_begin, output_asm_first_data_label_lpad.length);
+                memcpy(output_asm_first_data_label_lpad.string, lexer.line_start, output_asm_first_data_label_lpad.length);
                 for (int i = 0; i < output_asm_first_data_label_lpad.length; i++) {
                     if (!_lexer_iswhite(output_asm_first_data_label_lpad.string[i])) output_asm_first_data_label_lpad.string[i] = ' ';
                 }
