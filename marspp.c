@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
@@ -274,11 +275,18 @@ int main(int argc, char **argv)
     lexer_t lexer;
     lexer_init(&lexer, input_file_content, input_file_content + input_file_len, (char *)malloc(1 << 8), 1 << 8);
 
-    sv_t *output = NULL;
-    arrpush(output, ((sv_t){
+    sv_t *output_asm = NULL;
+    arrpush(output_asm, ((sv_t){
         .string = input_file_content,
         .length = input_file_len,
     }));
+
+    sv_t *output_asm_data_patches = NULL;
+    // If .data section is present, points to the .data part in the output_asm array
+    int output_asm_data_idx = -1;
+    // If .data section is present and there's at least one label, points to the first label in the output_asm array
+    int output_asm_first_data_label_idx = -1;
+    sv_t output_asm_first_data_label_lpad = {0};
 
     int mode = APAR_others;
     while (lexer_get_token(&lexer)) {
@@ -287,63 +295,136 @@ int main(int argc, char **argv)
         if (lexer.token == ALEX_directive) {
             if (strcmp(lexer.string, ".text") == 0) {
                 mode = APAR_text;
-            }
-            if (strcmp(lexer.string, ".data") == 0) {
+            } else if (strcmp(lexer.string, ".data") == 0) {
                 mode = APAR_data;
+
+                char *match_begin = lexer.where_firstchar;
+                char *match_end = lexer.where_lastchar;
+
+                sv_t last = arrpop(output_asm);
+                arrpush(output_asm, ((sv_t){ .string=last.string, .length=match_begin - last.string }));
+
+                char *buffer = (char *)malloc(lexer.string_len + 1);
+                snprintf(buffer, (lexer.string_len + 1), "%s", lexer.string);
+                arrpush(output_asm, ((sv_t){ .string=buffer, .length=lexer.string_len }));
+                output_asm_data_idx = arrlen(output_asm) - 1;
+
+                arrpush(output_asm, ((sv_t){ .string=match_end + 1, .length=last.length - (match_begin - last.string) - (match_end - match_begin) }));
+            } else {
+                mode = APAR_others;
             }
         }
 
         switch (mode) {
         case APAR_data: {
+            if (lexer.token == ALEX_ident && output_asm_first_data_label_idx == -1) {
+                char *match_begin = lexer.where_firstchar;
+                char *match_end = lexer.where_lastchar;
+
+                sv_t last = arrpop(output_asm);
+                arrpush(output_asm, ((sv_t){ .string=last.string, .length=match_begin - last.string }));
+
+                char *buffer = (char *)malloc(lexer.string_len + 1);
+                snprintf(buffer, (lexer.string_len + 1), "%s", lexer.string);
+                arrpush(output_asm, ((sv_t){ .string=buffer, .length=lexer.string_len }));
+                output_asm_first_data_label_idx = arrlen(output_asm) - 1;
+                output_asm_first_data_label_lpad.string = lexer.line_start;
+                output_asm_first_data_label_lpad.length = match_begin - lexer.line_start;
+
+                arrpush(output_asm, ((sv_t){ .string=match_end + 1, .length=last.length - (match_begin - last.string) - (match_end - match_begin) }));
+            }
         } break;
         case APAR_text: {
             if (strcmp(lexer.string, "print_string") == 0) {
                 char *match_begin = lexer.where_firstchar;
                 if (!lexer_get_token(&lexer)) die("Unexpected EOF");
                 if (lexer.token != '(') die("Expected ( after `print_string`");
-                if (!lexer_get_token(&lexer)) die("Unexpected EOF");
-                if (!lexer.token == ALEX_string) die("Expected an ident as the argumnt to print_string, got something else");
 
-                sv_t lpad = {
-                    .string = lexer.line_start,
-                    .length = match_begin - lexer.line_start,
-                };
+                bool parsing_second_arg = false;
+            one_more_arg:
+                sv_t lpad = { .string=lexer.line_start, .length=match_begin - lexer.line_start };
 
-                char *buffer = (char *)malloc(1 << 10);
-                int buffer_len = 0;
-                buffer_len += snprintf(buffer + buffer_len, (1 << 10) - buffer_len, "la $a0, %s\t# load %s\n%.*s", lexer.string, lexer.string, lpad.length, lpad.string);
-                buffer_len += snprintf(buffer + buffer_len, (1 << 10) - buffer_len, "li $v0, 4\t# specify print string service\n%.*s", lpad.length, lpad.string);
-                buffer_len += snprintf(buffer + buffer_len, (1 << 10) - buffer_len, "syscall\t# print %s", lexer.string);
+                sv_t last = arrpop(output_asm);
+                arrpush(output_asm, ((sv_t){ .string=last.string, .length=match_begin - last.string }));
 
                 if (!lexer_get_token(&lexer)) die("Unexpected EOF");
-                if (lexer.token != ')') die("Expected ) after `print_string(ident`");
+                switch (lexer.token) {
+                default: die("Expected an ident as the argumnt to print_string, got something else");
+                case ALEX_string: {
+                    char *generated_label = (char *)malloc(1 << 8);
+                    snprintf(generated_label, (1 << 8), "label_marspp_%d", arrlen(output_asm_data_patches));
+
+                    char *buffer = (char *)malloc(1 << 10);
+                    snprintf(buffer, (1 << 10), "%s:\t.asciiz\t\"%s\"", generated_label, lexer.string);
+                    arrpush(output_asm_data_patches, ((sv_t){ .string=buffer, .length=strlen(buffer) }));
+
+                    buffer = (char *)malloc(1 << 8);
+                    int buffer_len = 0;
+                    if (parsing_second_arg) {
+                        buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "\n%.*s", lpad.length, lpad.string);
+                    }
+                    buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "la $a0, %s\t# load %s\n%.*s", generated_label, lexer.string, lpad.length, lpad.string);
+                    buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "li $v0, 4\t# specify print string service\n%.*s", lpad.length, lpad.string);
+                    buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "syscall\t# print %s", lexer.string);
+
+                    arrpush(output_asm, ((sv_t){ .string=buffer, .length=buffer_len }));
+                } break;
+                case ALEX_ident: {
+                    char *buffer = (char *)malloc(1 << 8);
+                    int buffer_len = 0;
+                    if (parsing_second_arg) {
+                        buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "\n%.*s", lpad.length, lpad.string);
+                    }
+                    buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "la $a0, %s\t# load %s\n%.*s", lexer.string, lexer.string, lpad.length, lpad.string);
+                    buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "li $v0, 4\t# specify print string service\n%.*s", lpad.length, lpad.string);
+                    buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "syscall\t# print %s", lexer.string);
+
+                    arrpush(output_asm, ((sv_t){ .string=buffer, .length=buffer_len }));
+                } break;
+                }
+
+                if (!lexer_get_token(&lexer)) die("Unexpected EOF");
+                if (lexer.token == ',') {
+                    parsing_second_arg = true;
+                    goto one_more_arg;
+                }
+                if (lexer.token != ')') die("Expected ) after `print_string(`");
+
                 char *match_end = lexer.where_lastchar;
-
-                sv_t last = arrpop(output);
-
-                arrpush(output, ((sv_t){
-                    .string = last.string,
-                    .length = match_begin - last.string,
-                }));
-                arrpush(output, ((sv_t){
-                    .string = buffer,
-                    .length = buffer_len,
-                }));
-                arrpush(output, ((sv_t){
-                    .string = match_end + 1,
-                    .length = last.length - (match_begin - last.string) - (match_end - match_begin),
-                }));
+                arrpush(output_asm, ((sv_t){ .string=match_end + 1, .length=last.length - (match_begin - last.string) - (match_end - match_begin) }));
             }
         } break;
         default: break;
         }
     }
 
+    if (output_asm_data_idx == -1 && arrlen(output_asm_data_patches) > 0) {
+        char *data = "\n.data\n";
+        arrpush(output_asm, ((sv_t){ .string=data, .length=strlen(data) }));
+        output_asm_data_idx = arrlen(output_asm) - 1;
+    }
+
     f = fopen(output_filename, "wb");
     if (!f) die("Failed to open output.asm");
 
-    for (int i = 0; i < arrlen(output); i++) {
-        fprintf(f, "%.*s", output[i].length, output[i].string);
+    for (int i = 0; i < arrlen(output_asm); i++) {
+        fprintf(f, "%.*s", output_asm[i].length, output_asm[i].string);
+
+        // only one of the 2 if-statements will be true
+        // 1: in the .data section, there's no labels present so we have to push the patches right after the .data section
+        if (i == output_asm_data_idx) {
+            if (output_asm_first_data_label_idx == -1) {
+                for (int j = 0; j < arrlen(output_asm_data_patches); j++) {
+                    fprintf(f, "\n%.*s", output_asm_data_patches[j].length, output_asm_data_patches[j].string);
+                }
+            }
+        }
+        // 2: there's a label present in the .data section, we have to push the patches right before the label, respecting the prefix
+        if (i == output_asm_first_data_label_idx - 1) {
+            for (int i = 0; i < arrlen(output_asm_data_patches); i++) {
+                fprintf(f, "%.*s\n%.*s", output_asm_data_patches[i].length, output_asm_data_patches[i].string, output_asm_first_data_label_lpad.length, output_asm_first_data_label_lpad.string);
+            }
+        }
     }
 
     fclose(f);
