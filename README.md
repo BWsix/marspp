@@ -26,9 +26,9 @@ MARS++ will generate an `output.asm` with the corresponding assembly code:
 
 ```asm
 .text
-	la $a0, label_marspp_0	# load Hello world!
+	la $a0, label_marspp_0	# load "Hello world!"
 	li $v0, 4	# specify print string service
-	syscall	# print Hello world!
+	syscall	# print "Hello world!"
 	li $v0, 10	# specify exit service
 	syscall	# exit
 	

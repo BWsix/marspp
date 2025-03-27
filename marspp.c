@@ -394,9 +394,9 @@ int main(int argc, char **argv)
                     if (parsing_second_arg) {
                         buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "\n%.*s", lpad.length, lpad.string);
                     }
-                    buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "la $a0, %s\t# load %s\n%.*s", generated_label, lexer.string, lpad.length, lpad.string);
+                    buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "la $a0, %s\t# load \"%s\"\n%.*s", generated_label, lexer.string, lpad.length, lpad.string);
                     buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "li $v0, 4\t# specify print string service\n%.*s", lpad.length, lpad.string);
-                    buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "syscall\t# print %s", lexer.string);
+                    buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "syscall\t# print \"%s\"", lexer.string);
 
                     arrpush(output_asm, ((sv_t){ .string=buffer, .length=buffer_len }));
                 } break;
