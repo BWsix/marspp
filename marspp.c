@@ -452,8 +452,8 @@ int main(int argc, char **argv)
         }
         // 2: there's a label present in the .data section, we have to push the patches right before the label, respecting the prefix
         if (i == output_asm_first_data_label_idx - 1) {
-            for (int i = 0; i < arrlen(output_asm_data_patches); i++) {
-                fprintf(f, "%.*s\n%.*s", output_asm_data_patches[i].length, output_asm_data_patches[i].string, output_asm_first_data_label_lpad.length, output_asm_first_data_label_lpad.string);
+            for (int j = 0; j < arrlen(output_asm_data_patches); j++) {
+                fprintf(f, "%.*s\n%.*s", output_asm_data_patches[j].length, output_asm_data_patches[j].string, output_asm_first_data_label_lpad.length, output_asm_first_data_label_lpad.string);
             }
         }
     }
