@@ -340,6 +340,28 @@ int main(int argc, char **argv)
             }
         } break;
         case APAR_text: {
+            if (strcmp(lexer.string, "exit") == 0) {
+                char *match_begin = lexer.where_firstchar;
+                if (!lexer_get_token(&lexer)) die("Unexpected EOF");
+                if (lexer.token != '(') die("Expected ( after `exit`");
+                if (!lexer_get_token(&lexer)) die("Unexpected EOF");
+                if (lexer.token != ')') die("Expected ) after `exit(`");
+
+                sv_t lpad = { .string=(char *)malloc(match_begin - lexer.line_start), .length=(match_begin - lexer.line_start) };
+                memcpy(lpad.string, lexer.line_start, lpad.length);
+                for (int i = 0; i < lpad.length; i++) {
+                    if (!_lexer_iswhite(lpad.string[i])) lpad.string[i] = ' ';
+                }
+                sv_t last = arrpop(output_asm);
+                arrpush(output_asm, ((sv_t){ .string=last.string, .length=match_begin - last.string }));
+                char *buffer = (char *)malloc(1 << 8);
+                int buffer_len = 0;
+                buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "li $v0, 10\t# specify exit service\n%.*s", lpad.length, lpad.string);
+                buffer_len += snprintf(buffer + buffer_len, (1 << 8) - buffer_len, "syscall\t# exit\n%.*s", lpad.length, lpad.string);
+                arrpush(output_asm, ((sv_t){ .string=buffer, .length=buffer_len }));
+                char *match_end = lexer.where_lastchar;
+                arrpush(output_asm, ((sv_t){ .string=match_end + 1, .length=last.length - (match_begin - last.string) - (match_end - match_begin) }));
+            }
             if (strcmp(lexer.string, "print_string") == 0) {
                 char *match_begin = lexer.where_firstchar;
                 if (!lexer_get_token(&lexer)) die("Unexpected EOF");
